@@ -1,7 +1,18 @@
 import type { ApiErrorResponse } from "@/shared/types";
 import { clearSession, loadTokens, saveTokens } from "@/shared/lib/storage";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
+declare global {
+  interface Window {
+    __HAPPYHOUSE_CONFIG__?: {
+      apiBaseUrl?: string;
+    };
+  }
+}
+
+const runtimeApiBase =
+  typeof window !== "undefined" ? window.__HAPPYHOUSE_CONFIG__?.apiBaseUrl : undefined;
+
+const API_BASE = runtimeApiBase || import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1";
 const BACKEND_BASE = API_BASE.replace(/\/api\/v1\/?$/, "");
 
 type Method = "GET" | "POST" | "PATCH" | "DELETE";
