@@ -1,0 +1,70 @@
+CREATE TABLE users (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    login NVARCHAR(64) NOT NULL UNIQUE,
+    password_hash NVARCHAR(255) NOT NULL,
+    display_name NVARCHAR(120) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+CREATE TABLE houses (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(120) NOT NULL,
+    address NVARCHAR(255) NOT NULL,
+    created_by BIGINT NOT NULL REFERENCES users(id),
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+CREATE TABLE house_members (
+    user_id BIGINT NOT NULL,
+    house_id BIGINT NOT NULL,
+    role NVARCHAR(20) NOT NULL CHECK (role IN (N'resident', N'admin')),
+    joined_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    PRIMARY KEY (user_id, house_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE categories (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    house_id BIGINT NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+    name NVARCHAR(80) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UNIQUE (house_id, name)
+);
+
+CREATE TABLE posts (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    house_id BIGINT NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+    author_id BIGINT NOT NULL REFERENCES users(id),
+    category_id BIGINT NOT NULL REFERENCES categories(id),
+    title NVARCHAR(180) NOT NULL,
+    content NVARCHAR(MAX) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+CREATE TABLE comments (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    author_id BIGINT NOT NULL REFERENCES users(id),
+    content NVARCHAR(MAX) NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+CREATE TABLE invite_codes (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    house_id BIGINT NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+    code NVARCHAR(32) NOT NULL UNIQUE,
+    created_by BIGINT NOT NULL REFERENCES users(id),
+    is_active BIT NOT NULL DEFAULT 1,
+    expires_at DATETIME2 NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+CREATE TABLE refresh_tokens (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token NVARCHAR(255) NOT NULL UNIQUE,
+    expires_at DATETIME2 NOT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
