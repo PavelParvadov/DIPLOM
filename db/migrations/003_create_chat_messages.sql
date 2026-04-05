@@ -1,25 +1,11 @@
-IF OBJECT_ID('chat_messages', 'U') IS NULL
-BEGIN
-    CREATE TABLE chat_messages (
-        id BIGINT IDENTITY(1,1) PRIMARY KEY,
-        house_id BIGINT NOT NULL,
-        author_id BIGINT NOT NULL,
-        content NVARCHAR(MAX) NULL,
-        image_url NVARCHAR(255) NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        CONSTRAINT FK_chat_messages_house FOREIGN KEY (house_id) REFERENCES houses(id) ON DELETE CASCADE,
-        CONSTRAINT FK_chat_messages_author FOREIGN KEY (author_id) REFERENCES users(id)
-    );
-END
-GO
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id BIGSERIAL PRIMARY KEY,
+    house_id BIGINT NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
+    author_id BIGINT NOT NULL REFERENCES users(id),
+    content TEXT,
+    image_url VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.indexes
-    WHERE name = 'IX_chat_messages_house_created_at'
-      AND object_id = OBJECT_ID('chat_messages')
-)
-BEGIN
-    CREATE INDEX IX_chat_messages_house_created_at ON chat_messages (house_id, created_at ASC);
-END
-GO
+CREATE INDEX IF NOT EXISTS idx_chat_messages_house_created_at
+    ON chat_messages(house_id, created_at DESC);

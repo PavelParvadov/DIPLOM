@@ -1,4 +1,4 @@
-package mssql
+package postgres
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"happyhouse/backend/internal/domain"
 	"happyhouse/backend/pkg/pagination"
@@ -58,8 +60,8 @@ func NewRefreshTokenRepository(db *sql.DB) *RefreshTokenRepository {
 func (r *UserRepository) Create(ctx context.Context, input domain.RegisterInput, passwordHash string) (*domain.User, error) {
 	query := `
 		INSERT INTO users (login, password_hash, display_name)
-		OUTPUT INSERTED.id, INSERTED.login, INSERTED.display_name, INSERTED.created_at
-		VALUES (@p1, @p2, @p3);
+		VALUES ($1, $2, $3)
+		RETURNING id, login, display_name, created_at;
 	`
 
 	user := &domain.User{}
@@ -75,7 +77,7 @@ func (r *UserRepository) GetByLogin(ctx context.Context, login string) (*domain.
 	query := `
 		SELECT id, login, display_name, created_at, password_hash
 		FROM users
-		WHERE login = @p1;
+		WHERE login = $1;
 	`
 
 	user := &domain.User{}
@@ -92,7 +94,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*domain.User, e
 	query := `
 		SELECT id, login, display_name, created_at
 		FROM users
-		WHERE id = @p1;
+		WHERE id = $1;
 	`
 
 	user := &domain.User{}
@@ -117,8 +119,8 @@ func (r *HouseRepository) Create(ctx context.Context, createdBy int64, input dom
 
 	query := `
 		INSERT INTO houses (name, address, created_by)
-		OUTPUT INSERTED.id, INSERTED.name, INSERTED.address, INSERTED.created_by, INSERTED.created_at
-		VALUES (@p1, @p2, @p3);
+		VALUES ($1, $2, $3)
+		RETURNING id, name, address, created_by, created_at;
 	`
 
 	house := &domain.House{}
@@ -127,12 +129,12 @@ func (r *HouseRepository) Create(ctx context.Context, createdBy int64, input dom
 		return nil, normalizeError(err)
 	}
 
-	if _, err = tx.ExecContext(ctx, `INSERT INTO house_members (user_id, house_id, role) VALUES (@p1, @p2, @p3);`, createdBy, house.ID, domain.RoleAdmin); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO house_members (user_id, house_id, role) VALUES ($1, $2, $3);`, createdBy, house.ID, domain.RoleAdmin); err != nil {
 		return nil, normalizeError(err)
 	}
 
 	for _, name := range defaultCategories {
-		if _, err = tx.ExecContext(ctx, `INSERT INTO categories (house_id, name) VALUES (@p1, @p2);`, house.ID, name); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO categories (house_id, name) VALUES ($1, $2);`, house.ID, name); err != nil {
 			return nil, normalizeError(err)
 		}
 	}
@@ -148,7 +150,7 @@ func (r *HouseRepository) ListByUser(ctx context.Context, userID int64) ([]domai
 		SELECT h.id, h.name, h.address, h.created_by, h.created_at, hm.role
 		FROM house_members hm
 		JOIN houses h ON h.id = hm.house_id
-		WHERE hm.user_id = @p1
+		WHERE hm.user_id = $1
 		ORDER BY h.name;
 	`
 
@@ -180,7 +182,7 @@ func (r *HouseRepository) GetMembership(ctx context.Context, userID, houseID int
 	query := `
 		SELECT user_id, house_id, role, joined_at
 		FROM house_members
-		WHERE user_id = @p1 AND house_id = @p2;
+		WHERE user_id = $1 AND house_id = $2;
 	`
 
 	membership := &domain.Membership{}
@@ -201,7 +203,7 @@ func (r *HouseRepository) AddMembership(ctx context.Context, userID, houseID int
 		return err
 	}
 
-	query := `INSERT INTO house_members (user_id, house_id, role) VALUES (@p1, @p2, @p3);`
+	query := `INSERT INTO house_members (user_id, house_id, role) VALUES ($1, $2, $3);`
 	_, err = r.db.ExecContext(ctx, query, userID, houseID, role)
 	return normalizeError(err)
 }
@@ -210,7 +212,7 @@ func (r *CategoryRepository) ListByHouse(ctx context.Context, houseID int64) ([]
 	query := `
 		SELECT id, house_id, name, created_at
 		FROM categories
-		WHERE house_id = @p1
+		WHERE house_id = $1
 		ORDER BY name;
 	`
 
@@ -234,8 +236,8 @@ func (r *CategoryRepository) ListByHouse(ctx context.Context, houseID int64) ([]
 func (r *CategoryRepository) Create(ctx context.Context, houseID int64, input domain.CreateCategoryInput) (*domain.Category, error) {
 	query := `
 		INSERT INTO categories (house_id, name)
-		OUTPUT INSERTED.id, INSERTED.house_id, INSERTED.name, INSERTED.created_at
-		VALUES (@p1, @p2);
+		VALUES ($1, $2)
+		RETURNING id, house_id, name, created_at;
 	`
 
 	category := &domain.Category{}
@@ -250,9 +252,9 @@ func (r *CategoryRepository) Create(ctx context.Context, houseID int64, input do
 func (r *CategoryRepository) Update(ctx context.Context, houseID, categoryID int64, input domain.UpdateCategoryInput) (*domain.Category, error) {
 	query := `
 		UPDATE categories
-		SET name = @p3
-		OUTPUT INSERTED.id, INSERTED.house_id, INSERTED.name, INSERTED.created_at
-		WHERE house_id = @p1 AND id = @p2;
+		SET name = $3
+		WHERE house_id = $1 AND id = $2
+		RETURNING id, house_id, name, created_at;
 	`
 
 	category := &domain.Category{}
@@ -265,7 +267,7 @@ func (r *CategoryRepository) Update(ctx context.Context, houseID, categoryID int
 }
 
 func (r *CategoryRepository) Delete(ctx context.Context, houseID, categoryID int64) error {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM categories WHERE house_id = @p1 AND id = @p2;`, houseID, categoryID)
+	result, err := r.db.ExecContext(ctx, `DELETE FROM categories WHERE house_id = $1 AND id = $2;`, houseID, categoryID)
 	if err != nil {
 		return normalizeError(err)
 	}
@@ -280,7 +282,7 @@ func (r *CategoryRepository) GetByID(ctx context.Context, houseID, categoryID in
 	query := `
 		SELECT id, house_id, name, created_at
 		FROM categories
-		WHERE house_id = @p1 AND id = @p2;
+		WHERE house_id = $1 AND id = $2;
 	`
 
 	category := &domain.Category{}
@@ -293,10 +295,10 @@ func (r *CategoryRepository) GetByID(ctx context.Context, houseID, categoryID in
 }
 
 func (r *PostRepository) ListByHouse(ctx context.Context, houseID int64, filter domain.ListPostsFilter) ([]domain.Post, int, error) {
-	countQuery := `SELECT COUNT(1) FROM posts WHERE house_id = @p1`
+	countQuery := `SELECT COUNT(1) FROM posts WHERE house_id = $1`
 	countArgs := []any{houseID}
 	if filter.CategoryID != nil {
-		countQuery += " AND category_id = @p2"
+		countQuery += " AND category_id = $2"
 		countArgs = append(countArgs, *filter.CategoryID)
 	}
 
@@ -313,18 +315,18 @@ func (r *PostRepository) ListByHouse(ctx context.Context, houseID int64, filter 
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
 		JOIN categories c ON c.id = p.category_id
-		WHERE p.house_id = @p1`
+		WHERE p.house_id = $1`
 
 	args := []any{houseID}
 	if filter.CategoryID != nil {
-		query += " AND p.category_id = @p2"
+		query += " AND p.category_id = $2"
 		args = append(args, *filter.CategoryID)
 	}
 
 	page, pageSize := pagination.Normalize(filter.Page, filter.PageSize)
 	offset := pagination.Offset(page, pageSize)
-	query += fmt.Sprintf(" ORDER BY p.created_at DESC OFFSET @p%d ROWS FETCH NEXT @p%d ROWS ONLY;", len(args)+1, len(args)+2)
-	args = append(args, offset, pageSize)
+	query += fmt.Sprintf(" ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d;", len(args)+1, len(args)+2)
+	args = append(args, pageSize, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -352,7 +354,7 @@ func (r *PostRepository) GetByID(ctx context.Context, houseID, postID int64) (*d
 		FROM posts p
 		JOIN users u ON u.id = p.author_id
 		JOIN categories c ON c.id = p.category_id
-		WHERE p.house_id = @p1 AND p.id = @p2;
+		WHERE p.house_id = $1 AND p.id = $2;
 	`
 
 	row := r.db.QueryRowContext(ctx, query, houseID, postID)
@@ -391,8 +393,8 @@ func scanPost(scanner interface {
 func (r *PostRepository) Create(ctx context.Context, houseID, authorID int64, input domain.CreatePostInput) (*domain.Post, error) {
 	query := `
 		INSERT INTO posts (house_id, author_id, category_id, title, content, image_url)
-		OUTPUT INSERTED.id
-		VALUES (@p1, @p2, @p3, @p4, @p5, @p6);
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id;
 	`
 
 	var id int64
@@ -405,22 +407,20 @@ func (r *PostRepository) Create(ctx context.Context, houseID, authorID int64, in
 func (r *PostRepository) Update(ctx context.Context, houseID, postID int64, input domain.UpdatePostInput) (*domain.Post, error) {
 	query := `
 		UPDATE posts
-		SET category_id = @p3, title = @p4, content = @p5, image_url = @p6, updated_at = SYSDATETIME()
-		WHERE house_id = @p1 AND id = @p2;
+		SET category_id = $3, title = $4, content = $5, image_url = $6, updated_at = NOW()
+		WHERE house_id = $1 AND id = $2
+		RETURNING id;
 	`
-	result, err := r.db.ExecContext(ctx, query, houseID, postID, input.CategoryID, input.Title, input.Content, nullableString(input.ImageURL))
-	if err != nil {
+
+	var id int64
+	if err := r.db.QueryRowContext(ctx, query, houseID, postID, input.CategoryID, input.Title, input.Content, nullableString(input.ImageURL)).Scan(&id); err != nil {
 		return nil, normalizeError(err)
 	}
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return nil, domain.ErrNotFound
-	}
-	return r.GetByID(ctx, houseID, postID)
+	return r.GetByID(ctx, houseID, id)
 }
 
 func (r *PostRepository) Delete(ctx context.Context, houseID, postID int64) error {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM posts WHERE house_id = @p1 AND id = @p2;`, houseID, postID)
+	result, err := r.db.ExecContext(ctx, `DELETE FROM posts WHERE house_id = $1 AND id = $2;`, houseID, postID)
 	if err != nil {
 		return normalizeError(err)
 	}
@@ -436,7 +436,7 @@ func (r *CommentRepository) ListByPost(ctx context.Context, houseID, postID int6
 		SELECT COUNT(1)
 		FROM comments cm
 		JOIN posts p ON p.id = cm.post_id
-		WHERE p.house_id = @p1 AND cm.post_id = @p2;
+		WHERE p.house_id = $1 AND cm.post_id = $2;
 	`
 
 	var total int
@@ -451,11 +451,11 @@ func (r *CommentRepository) ListByPost(ctx context.Context, houseID, postID int6
 		FROM comments cm
 		JOIN posts p ON p.id = cm.post_id
 		JOIN users u ON u.id = cm.author_id
-		WHERE p.house_id = @p1 AND cm.post_id = @p2
+		WHERE p.house_id = $1 AND cm.post_id = $2
 		ORDER BY cm.created_at ASC
-		OFFSET @p3 ROWS FETCH NEXT @p4 ROWS ONLY;
+		LIMIT $3 OFFSET $4;
 	`
-	rows, err := r.db.QueryContext(ctx, query, houseID, postID, offset, pageSize)
+	rows, err := r.db.QueryContext(ctx, query, houseID, postID, pageSize, offset)
 	if err != nil {
 		return nil, 0, normalizeError(err)
 	}
@@ -475,8 +475,8 @@ func (r *CommentRepository) ListByPost(ctx context.Context, houseID, postID int6
 func (r *CommentRepository) Create(ctx context.Context, houseID, postID, authorID int64, input domain.CreateCommentInput) (*domain.Comment, error) {
 	query := `
 		INSERT INTO comments (post_id, author_id, content)
-		OUTPUT INSERTED.id
-		VALUES (@p1, @p2, @p3);
+		VALUES ($1, $2, $3)
+		RETURNING id;
 	`
 	var id int64
 	if err := r.db.QueryRowContext(ctx, query, postID, authorID, input.Content).Scan(&id); err != nil {
@@ -488,7 +488,7 @@ func (r *CommentRepository) Create(ctx context.Context, houseID, postID, authorI
 		FROM comments cm
 		JOIN posts p ON p.id = cm.post_id
 		JOIN users u ON u.id = cm.author_id
-		WHERE p.house_id = @p1 AND cm.id = @p2;
+		WHERE p.house_id = $1 AND cm.id = $2;
 	`
 	comment := &domain.Comment{}
 	err := r.db.QueryRowContext(ctx, row, houseID, id).
@@ -503,11 +503,12 @@ func (r *ChatRepository) ListByHouse(ctx context.Context, houseID int64, limit i
 	query := `
 		SELECT *
 		FROM (
-			SELECT TOP (@p2) cm.id, cm.house_id, cm.author_id, cm.content, cm.image_url, cm.created_at, u.display_name
+			SELECT cm.id, cm.house_id, cm.author_id, cm.content, cm.image_url, cm.created_at, u.display_name
 			FROM chat_messages cm
 			JOIN users u ON u.id = cm.author_id
-			WHERE cm.house_id = @p1
+			WHERE cm.house_id = $1
 			ORDER BY cm.created_at DESC
+			LIMIT $2
 		) recent_messages
 		ORDER BY recent_messages.created_at ASC;
 	`
@@ -532,8 +533,8 @@ func (r *ChatRepository) ListByHouse(ctx context.Context, houseID int64, limit i
 func (r *ChatRepository) Create(ctx context.Context, houseID, authorID int64, input domain.CreateChatMessageInput) (*domain.ChatMessage, error) {
 	query := `
 		INSERT INTO chat_messages (house_id, author_id, content, image_url)
-		OUTPUT INSERTED.id
-		VALUES (@p1, @p2, @p3, @p4);
+		VALUES ($1, $2, $3, $4)
+		RETURNING id;
 	`
 
 	var id int64
@@ -545,7 +546,7 @@ func (r *ChatRepository) Create(ctx context.Context, houseID, authorID int64, in
 		SELECT cm.id, cm.house_id, cm.author_id, cm.content, cm.image_url, cm.created_at, u.display_name
 		FROM chat_messages cm
 		JOIN users u ON u.id = cm.author_id
-		WHERE cm.id = @p1;
+		WHERE cm.id = $1;
 	`
 
 	item, err := scanChatMessage(r.db.QueryRowContext(ctx, row, id))
@@ -582,7 +583,7 @@ func (r *InviteCodeRepository) ListByHouse(ctx context.Context, houseID int64) (
 		SELECT ic.id, ic.house_id, ic.code, ic.created_by, ic.is_active, ic.expires_at, ic.created_at, u.login
 		FROM invite_codes ic
 		JOIN users u ON u.id = ic.created_by
-		WHERE ic.house_id = @p1
+		WHERE ic.house_id = $1
 		ORDER BY ic.created_at DESC;
 	`
 	rows, err := r.db.QueryContext(ctx, query, houseID)
@@ -593,20 +594,11 @@ func (r *InviteCodeRepository) ListByHouse(ctx context.Context, houseID int64) (
 
 	items := make([]domain.InviteCode, 0)
 	for rows.Next() {
-		var invite domain.InviteCode
-		if err := rows.Scan(
-			&invite.ID,
-			&invite.HouseID,
-			&invite.Code,
-			&invite.CreatedBy,
-			&invite.IsActive,
-			&invite.ExpiresAt,
-			&invite.CreatedAt,
-			&invite.CreatedByLogin,
-		); err != nil {
+		invite, err := scanInviteCode(rows)
+		if err != nil {
 			return nil, err
 		}
-		items = append(items, invite)
+		items = append(items, *invite)
 	}
 	return items, rows.Err()
 }
@@ -614,8 +606,8 @@ func (r *InviteCodeRepository) ListByHouse(ctx context.Context, houseID int64) (
 func (r *InviteCodeRepository) Create(ctx context.Context, houseID, createdBy int64, input domain.CreateInviteCodeInput, code string) (*domain.InviteCode, error) {
 	query := `
 		INSERT INTO invite_codes (house_id, code, created_by, expires_at)
-		OUTPUT INSERTED.id
-		VALUES (@p1, @p2, @p3, @p4);
+		VALUES ($1, $2, $3, $4)
+		RETURNING id;
 	`
 
 	var id int64
@@ -627,19 +619,10 @@ func (r *InviteCodeRepository) Create(ctx context.Context, houseID, createdBy in
 		SELECT ic.id, ic.house_id, ic.code, ic.created_by, ic.is_active, ic.expires_at, ic.created_at, u.login
 		FROM invite_codes ic
 		JOIN users u ON u.id = ic.created_by
-		WHERE ic.id = @p1;
+		WHERE ic.id = $1;
 	`
-	invite := &domain.InviteCode{}
-	err := r.db.QueryRowContext(ctx, row, id).Scan(
-		&invite.ID,
-		&invite.HouseID,
-		&invite.Code,
-		&invite.CreatedBy,
-		&invite.IsActive,
-		&invite.ExpiresAt,
-		&invite.CreatedAt,
-		&invite.CreatedByLogin,
-	)
+
+	invite, err := scanInviteCode(r.db.QueryRowContext(ctx, row, id))
 	if err != nil {
 		return nil, normalizeError(err)
 	}
@@ -650,20 +633,24 @@ func (r *InviteCodeRepository) GetActiveByCode(ctx context.Context, code string)
 	query := `
 		SELECT id, house_id, code, created_by, is_active, expires_at, created_at
 		FROM invite_codes
-		WHERE code = @p1 AND is_active = 1;
+		WHERE code = $1 AND is_active = TRUE;
 	`
 
+	var expiresAt sql.NullTime
 	invite := &domain.InviteCode{}
 	err := r.db.QueryRowContext(ctx, query, code).
-		Scan(&invite.ID, &invite.HouseID, &invite.Code, &invite.CreatedBy, &invite.IsActive, &invite.ExpiresAt, &invite.CreatedAt)
+		Scan(&invite.ID, &invite.HouseID, &invite.Code, &invite.CreatedBy, &invite.IsActive, &expiresAt, &invite.CreatedAt)
 	if err != nil {
 		return nil, normalizeError(err)
+	}
+	if expiresAt.Valid {
+		invite.ExpiresAt = &expiresAt.Time
 	}
 	return invite, nil
 }
 
 func (r *InviteCodeRepository) Deactivate(ctx context.Context, houseID, inviteCodeID int64) error {
-	result, err := r.db.ExecContext(ctx, `UPDATE invite_codes SET is_active = 0 WHERE house_id = @p1 AND id = @p2;`, houseID, inviteCodeID)
+	result, err := r.db.ExecContext(ctx, `UPDATE invite_codes SET is_active = FALSE WHERE house_id = $1 AND id = $2;`, houseID, inviteCodeID)
 	if err != nil {
 		return normalizeError(err)
 	}
@@ -674,10 +661,33 @@ func (r *InviteCodeRepository) Deactivate(ctx context.Context, houseID, inviteCo
 	return nil
 }
 
+func scanInviteCode(scanner interface {
+	Scan(dest ...any) error
+}) (*domain.InviteCode, error) {
+	invite := &domain.InviteCode{}
+	var expiresAt sql.NullTime
+	if err := scanner.Scan(
+		&invite.ID,
+		&invite.HouseID,
+		&invite.Code,
+		&invite.CreatedBy,
+		&invite.IsActive,
+		&expiresAt,
+		&invite.CreatedAt,
+		&invite.CreatedByLogin,
+	); err != nil {
+		return nil, err
+	}
+	if expiresAt.Valid {
+		invite.ExpiresAt = &expiresAt.Time
+	}
+	return invite, nil
+}
+
 func (r *RefreshTokenRepository) Create(ctx context.Context, userID int64, token string, expiresAt time.Time) error {
 	query := `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
-		VALUES (@p1, @p2, @p3);
+		VALUES ($1, $2, $3);
 	`
 	_, err := r.db.ExecContext(ctx, query, userID, token, expiresAt)
 	return normalizeError(err)
@@ -687,7 +697,7 @@ func (r *RefreshTokenRepository) Get(ctx context.Context, token string) (*domain
 	query := `
 		SELECT id, user_id, token, expires_at, created_at
 		FROM refresh_tokens
-		WHERE token = @p1;
+		WHERE token = $1;
 	`
 	session := &domain.RefreshSession{}
 	err := r.db.QueryRowContext(ctx, query, token).
@@ -699,12 +709,12 @@ func (r *RefreshTokenRepository) Get(ctx context.Context, token string) (*domain
 }
 
 func (r *RefreshTokenRepository) Delete(ctx context.Context, token string) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE token = @p1;`, token)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE token = $1;`, token)
 	return normalizeError(err)
 }
 
 func (r *RefreshTokenRepository) DeleteByUser(ctx context.Context, userID int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE user_id = @p1;`, userID)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE user_id = $1;`, userID)
 	return normalizeError(err)
 }
 
@@ -714,6 +724,13 @@ func normalizeError(err error) error {
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ErrNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505":
+			return domain.ErrConflict
+		}
 	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "unique") || strings.Contains(message, "duplicate") || strings.Contains(message, "primary key") {

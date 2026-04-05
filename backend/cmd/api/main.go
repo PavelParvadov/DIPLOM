@@ -10,11 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/microsoft/go-mssqldb"
-	_ "github.com/microsoft/go-mssqldb/sharedmemory"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"happyhouse/backend/internal/config"
-	"happyhouse/backend/internal/repository/mssql"
+	"happyhouse/backend/internal/repository/postgres"
 	"happyhouse/backend/internal/transport/http/handler"
 	"happyhouse/backend/internal/usecase"
 	"happyhouse/backend/pkg/auth"
@@ -26,7 +25,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	db, err := sql.Open("sqlserver", cfg.DatabaseURL)
+	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
@@ -40,14 +39,14 @@ func main() {
 	}
 
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret)
-	userRepo := mssql.NewUserRepository(db)
-	houseRepo := mssql.NewHouseRepository(db)
-	categoryRepo := mssql.NewCategoryRepository(db)
-	postRepo := mssql.NewPostRepository(db)
-	commentRepo := mssql.NewCommentRepository(db)
-	chatRepo := mssql.NewChatRepository(db)
-	inviteRepo := mssql.NewInviteCodeRepository(db)
-	refreshRepo := mssql.NewRefreshTokenRepository(db)
+	userRepo := postgres.NewUserRepository(db)
+	houseRepo := postgres.NewHouseRepository(db)
+	categoryRepo := postgres.NewCategoryRepository(db)
+	postRepo := postgres.NewPostRepository(db)
+	commentRepo := postgres.NewCommentRepository(db)
+	chatRepo := postgres.NewChatRepository(db)
+	inviteRepo := postgres.NewInviteCodeRepository(db)
+	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
 	authUC := usecase.NewAuthUseCase(userRepo, refreshRepo, tokenManager, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	houseUC := usecase.NewHouseUseCase(houseRepo, inviteRepo)

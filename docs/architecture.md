@@ -1,28 +1,28 @@
 # HappyHouse Architecture
 
-HappyHouse разделен на два независимых приложения:
+HappyHouse is split into two independent applications:
 
-- `backend/` содержит API на Go, реализованное в стиле clean architecture.
-- `frontend/` содержит SPA на React + TypeScript.
+- `backend/` contains the Go API built in clean architecture style
+- `frontend/` contains the React + TypeScript SPA
 
-Слои backend:
+## Backend layers
 
-- `internal/domain` описывает доменные сущности и контракты репозиториев.
-- `internal/usecase` содержит бизнес-правила.
-- `internal/repository/mssql` реализует доступ к MS SQL Server.
-- `internal/transport/http` содержит роутинг, middleware и DTO.
+- `internal/domain` describes domain entities and repository contracts
+- `internal/usecase` contains business rules
+- `internal/repository/postgres` implements PostgreSQL data access
+- `internal/transport/http` contains routing, middleware, handlers and DTOs
 
-Поток данных:
+## Data flow
 
-1. HTTP handler принимает запрос и валидирует транспортный формат.
-2. Use case проверяет членство в доме, роли и прикладные правила.
-3. Repository читает или изменяет данные в MS SQL Server.
-4. Handler возвращает единообразный JSON-ответ.
+1. HTTP handler accepts the request and validates transport input.
+2. Use case checks house membership, roles and business rules.
+3. Repository reads or writes data in PostgreSQL.
+4. Handler returns a normalized JSON response.
 
-Frontend структура:
+## Frontend structure
 
-- `src/app` для роутера, layout и providers.
-- `src/pages` для экранов.
-- `src/features` для сценариев и форм.
-- `src/entities` для типизации доменных сущностей.
-- `src/shared` для API-клиента, UI и утилит.
+- `src/app` for router, layout and providers
+- `src/pages` for screens
+- `src/features` for user scenarios and forms
+- `src/entities` for typed domain entities
+- `src/shared` for API client, UI primitives and utilities

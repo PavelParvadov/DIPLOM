@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: happyhouse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: happyhouse
+      POSTGRES_USER: happyhouse
+      POSTGRES_PASSWORD: happyhouse
+    ports:
+      - "5432:5432"
+    volumes:
+      - happyhouse_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  happyhouse_postgres_data:
