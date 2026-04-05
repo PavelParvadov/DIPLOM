@@ -9,6 +9,7 @@ RUN set -eux; \
         cd /app/backend; \
     fi; \
     go mod download; \
+    go mod tidy; \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /bin/happyhouse-api ./cmd/api
 
 FROM alpine:3.21
