@@ -78,6 +78,14 @@ After PostgreSQL is created, run the SQL files in this order:
 
 If you use a fresh database, `001_create_schema.sql` already contains the full current schema. Files `002` and `003` are left as safe incremental migrations.
 
+You can apply these files without `psql` by using the local Go helper:
+
+```powershell
+cd backend
+$env:DATABASE_URL="<paste Railway DATABASE_PUBLIC_URL here>"
+go run ./cmd/dbexec ..\db\migrations\001_create_schema.sql ..\db\migrations\002_add_post_image.sql ..\db\migrations\003_create_chat_messages.sql ..\db\seed\003_penza_showcase_seed.sql
+```
+
 ## What is already ready in the repo
 
 - backend Dockerfile: [backend/Dockerfile](/C:/Users/User/go-services/DIPLOM/backend/Dockerfile)
