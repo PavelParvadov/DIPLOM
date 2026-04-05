@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS media_assets (
+    id BIGSERIAL PRIMARY KEY,
+    public_id VARCHAR(255) NOT NULL UNIQUE,
+    content_type VARCHAR(120) NOT NULL,
+    data BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS invite_codes (
     id BIGSERIAL PRIMARY KEY,
     house_id BIGINT NOT NULL REFERENCES houses(id) ON DELETE CASCADE,
@@ -83,5 +91,6 @@ CREATE INDEX IF NOT EXISTS idx_posts_house_category_created_at ON posts(house_id
 CREATE INDEX IF NOT EXISTS idx_posts_house_created_at ON posts(house_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_comments_post_created_at ON comments(post_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_house_created_at ON chat_messages(house_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_assets_public_id ON media_assets(public_id);
 CREATE INDEX IF NOT EXISTS idx_invite_codes_house_created_at ON invite_codes(house_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);

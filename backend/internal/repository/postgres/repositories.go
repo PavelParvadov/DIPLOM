@@ -42,6 +42,10 @@ type InviteCodeRepository struct {
 	db *sql.DB
 }
 
+type MediaRepository struct {
+	db *sql.DB
+}
+
 type RefreshTokenRepository struct {
 	db *sql.DB
 }
@@ -53,6 +57,7 @@ func NewPostRepository(db *sql.DB) *PostRepository             { return &PostRep
 func NewCommentRepository(db *sql.DB) *CommentRepository       { return &CommentRepository{db: db} }
 func NewChatRepository(db *sql.DB) *ChatRepository             { return &ChatRepository{db: db} }
 func NewInviteCodeRepository(db *sql.DB) *InviteCodeRepository { return &InviteCodeRepository{db: db} }
+func NewMediaRepository(db *sql.DB) *MediaRepository           { return &MediaRepository{db: db} }
 func NewRefreshTokenRepository(db *sql.DB) *RefreshTokenRepository {
 	return &RefreshTokenRepository{db: db}
 }
@@ -659,6 +664,48 @@ func (r *InviteCodeRepository) Deactivate(ctx context.Context, houseID, inviteCo
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+func (r *MediaRepository) Create(ctx context.Context, publicID, contentType string, data []byte) (*domain.MediaAsset, error) {
+	query := `
+		INSERT INTO media_assets (public_id, content_type, data)
+		VALUES ($1, $2, $3)
+		RETURNING id, public_id, content_type, data, created_at;
+	`
+
+	asset := &domain.MediaAsset{}
+	err := r.db.QueryRowContext(ctx, query, publicID, contentType, data).Scan(
+		&asset.ID,
+		&asset.PublicID,
+		&asset.ContentType,
+		&asset.Data,
+		&asset.CreatedAt,
+	)
+	if err != nil {
+		return nil, normalizeError(err)
+	}
+	return asset, nil
+}
+
+func (r *MediaRepository) GetByPublicID(ctx context.Context, publicID string) (*domain.MediaAsset, error) {
+	query := `
+		SELECT id, public_id, content_type, data, created_at
+		FROM media_assets
+		WHERE public_id = $1;
+	`
+
+	asset := &domain.MediaAsset{}
+	err := r.db.QueryRowContext(ctx, query, publicID).Scan(
+		&asset.ID,
+		&asset.PublicID,
+		&asset.ContentType,
+		&asset.Data,
+		&asset.CreatedAt,
+	)
+	if err != nil {
+		return nil, normalizeError(err)
+	}
+	return asset, nil
 }
 
 func scanInviteCode(scanner interface {

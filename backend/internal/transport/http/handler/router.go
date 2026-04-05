@@ -25,6 +25,7 @@ type Handler struct {
 	comments   *usecase.CommentUseCase
 	chats      *usecase.ChatUseCase
 	invites    *usecase.InviteCodeUseCase
+	media      *usecase.MediaUseCase
 	tokenMgr   *auth.TokenManager
 	origin     string
 	uploadDir  string
@@ -38,6 +39,7 @@ func New(
 	commentUC *usecase.CommentUseCase,
 	chatUC *usecase.ChatUseCase,
 	inviteUC *usecase.InviteCodeUseCase,
+	mediaUC *usecase.MediaUseCase,
 	tokenMgr *auth.TokenManager,
 	frontendOrigin string,
 	uploadDir string,
@@ -50,6 +52,7 @@ func New(
 		comments:   commentUC,
 		chats:      chatUC,
 		invites:    inviteUC,
+		media:      mediaUC,
 		tokenMgr:   tokenMgr,
 		origin:     frontendOrigin,
 		uploadDir:  uploadDir,
@@ -73,7 +76,7 @@ func (h *Handler) Router() http.Handler {
 	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, httpx.Envelope{"status": "ok"})
 	})
-	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(h.uploadDir))))
+	router.Get("/uploads/*", h.handleUploadedAsset)
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", h.handleRegister)

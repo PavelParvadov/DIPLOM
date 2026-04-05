@@ -42,14 +42,14 @@ Public health endpoint:
 
 Source folder: `/frontend`
 
-Required build variable:
+Required variable:
 
 - `VITE_API_BASE_URL=https://<your-backend-domain>/api/v1`
 
 Important:
 
-- `VITE_API_BASE_URL` is read at build time
-- set it before the frontend deploy starts
+- `VITE_API_BASE_URL` is injected into `config.js` when the frontend container starts
+- after changing it, redeploy the frontend service
 
 ## Recommended deploy order
 
@@ -73,8 +73,9 @@ After PostgreSQL is created, run the SQL files in this order:
 1. `db/migrations/001_create_schema.sql`
 2. `db/migrations/002_add_post_image.sql`
 3. `db/migrations/003_create_chat_messages.sql`
-4. optional demo data: `db/seed/001_demo_seed.sql`
-5. optional showcase data for diploma demo: `db/seed/003_penza_showcase_seed.sql`
+4. `db/migrations/004_create_media_assets.sql`
+5. optional demo data: `db/seed/001_demo_seed.sql`
+6. optional showcase data for diploma demo: `db/seed/003_penza_showcase_seed.sql`
 
 If you use a fresh database, `001_create_schema.sql` already contains the full current schema. Files `002` and `003` are left as safe incremental migrations.
 
@@ -83,7 +84,7 @@ You can apply these files without `psql` by using the local Go helper:
 ```powershell
 cd backend
 $env:DATABASE_URL="<paste Railway DATABASE_PUBLIC_URL here>"
-go run ./cmd/dbexec ..\db\migrations\001_create_schema.sql ..\db\migrations\002_add_post_image.sql ..\db\migrations\003_create_chat_messages.sql ..\db\seed\003_penza_showcase_seed.sql
+go run ./cmd/dbexec ..\db\migrations\001_create_schema.sql ..\db\migrations\002_add_post_image.sql ..\db\migrations\003_create_chat_messages.sql ..\db\migrations\004_create_media_assets.sql ..\db\seed\003_penza_showcase_seed.sql
 ```
 
 ## What is already ready in the repo

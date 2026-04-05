@@ -19,6 +19,7 @@ Run SQL files in this order:
 1. `db/migrations/001_create_schema.sql`
 2. `db/migrations/002_add_post_image.sql`
 3. `db/migrations/003_create_chat_messages.sql`
+4. `db/migrations/004_create_media_assets.sql`
 
 Optional seed files:
 

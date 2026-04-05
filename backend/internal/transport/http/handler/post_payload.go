@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -85,10 +86,10 @@ func (h *Handler) saveOptionalImage(r *http.Request, fieldName string) (string, 
 	}
 	defer file.Close()
 
-	return h.saveUploadedImage(file, header)
+	return h.saveUploadedImage(r.Context(), file, header)
 }
 
-func (h *Handler) saveUploadedImage(file multipart.File, header *multipart.FileHeader) (string, error) {
+func (h *Handler) saveUploadedImage(ctx context.Context, file multipart.File, header *multipart.FileHeader) (string, error) {
 	data, err := io.ReadAll(io.LimitReader(file, maxUploadSize+1))
 	if err != nil {
 		return "", fmt.Errorf("не удалось сохранить изображение")
@@ -115,6 +116,10 @@ func (h *Handler) saveUploadedImage(file multipart.File, header *multipart.FileH
 	fileName, err := randomFileName(extension)
 	if err != nil {
 		return "", fmt.Errorf("не удалось сохранить изображение")
+	}
+
+	if _, err := h.media.Create(ctx, fileName, contentType, data); err == nil {
+		return "/uploads/" + fileName, nil
 	}
 
 	targetPath := filepath.Join(h.uploadDir, fileName)

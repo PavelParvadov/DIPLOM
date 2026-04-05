@@ -46,6 +46,7 @@ func main() {
 	commentRepo := postgres.NewCommentRepository(db)
 	chatRepo := postgres.NewChatRepository(db)
 	inviteRepo := postgres.NewInviteCodeRepository(db)
+	mediaRepo := postgres.NewMediaRepository(db)
 	refreshRepo := postgres.NewRefreshTokenRepository(db)
 
 	authUC := usecase.NewAuthUseCase(userRepo, refreshRepo, tokenManager, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
@@ -55,8 +56,9 @@ func main() {
 	commentUC := usecase.NewCommentUseCase(houseRepo, postRepo, commentRepo)
 	chatUC := usecase.NewChatUseCase(houseRepo, chatRepo)
 	inviteUC := usecase.NewInviteCodeUseCase(houseRepo, inviteRepo)
+	mediaUC := usecase.NewMediaUseCase(mediaRepo)
 
-	httpHandler := handler.New(authUC, houseUC, categoryUC, postUC, commentUC, chatUC, inviteUC, tokenManager, cfg.FrontendOrigin, cfg.UploadDir)
+	httpHandler := handler.New(authUC, houseUC, categoryUC, postUC, commentUC, chatUC, inviteUC, mediaUC, tokenManager, cfg.FrontendOrigin, cfg.UploadDir)
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      httpHandler.Router(),

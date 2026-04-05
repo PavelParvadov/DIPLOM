@@ -51,6 +51,11 @@ type InviteCodeRepository interface {
 	Deactivate(ctx context.Context, houseID, inviteCodeID int64) error
 }
 
+type MediaRepository interface {
+	Create(ctx context.Context, publicID, contentType string, data []byte) (*MediaAsset, error)
+	GetByPublicID(ctx context.Context, publicID string) (*MediaAsset, error)
+}
+
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, userID int64, token string, expiresAt time.Time) error
 	Get(ctx context.Context, token string) (*RefreshSession, error)

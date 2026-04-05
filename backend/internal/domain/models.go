@@ -86,6 +86,14 @@ type InviteCode struct {
 	CreatedByLogin string     `json:"createdByLogin"`
 }
 
+type MediaAsset struct {
+	ID          int64     `json:"id"`
+	PublicID    string    `json:"publicId"`
+	ContentType string    `json:"contentType"`
+	Data        []byte    `json:"-"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type RefreshSession struct {
 	ID        int64
 	UserID    int64
